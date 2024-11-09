@@ -1,48 +1,50 @@
 from utils import *
+import random
+import numpy as np
 
-q = 28871271685163
-B = 100 #Bound of the values of x and y
-t = 1 #Size of the polynomial
-n = 2 #Size of the vector
-Bx = 10 #Bound of x
-By = 10 #Bound of y
-K = 2*B*n*B*n + 1
+q = 2**607 - 1
+B = 10 #Bound of the values of x and y entries
+t = 4 #Size of the polynomial n sur le papier
+n = 5 #Size of the vector l sur le papier
+K = n*(B*n)*(B*n) + 1
 delta = q // K
+P = np.polynomial.Polynomial([1] + [0] * (t-2) + [1])
 
 def setup():
-    #a = sample_uniform_vector(t, q)
-    a = random.randint(0, q - 1)
-    s = sample_bounded_vector(n, 1)
-    e = sample_bounded_vector(n, 1)
-    b = vector_vector_addition(scalar_vector_multiplication(a, s, q), e, q)
+    a = rand_pol(t, q)
+    s = [rand_bd_pol(t, 1) for _ in range(n)]
+    e = [rand_bd_pol(t, 1) for _ in range(n)]
+    b = [a * s[i] + e[i] % P for i in range(n)]
     mpk = (a, b)
     return (s, mpk)
 
 def encrypt(mpk, x):
     (a, b) = mpk
-    #u = sample_bounded_vector(t, 1)
-    u = random.randint(-1, 1)
-    c0 = a*u % q
-    mu = scalar_vector_multiplication(delta, x, q)
-    c1 = vector_vector_addition(scalar_vector_multiplication(u, b, q), mu, q)
+    u = rand_bd_pol(t, 1)
+    e0 = rand_bd_pol(t, 1)
+    e1 = [rand_bd_pol(t, 1) for _ in range(n)]
+    c0 = a * u + e0 % P
+    mu = [delta * x[i] * pol_unit(t) for i in range(n)]
+    c1 = [u * b[i] + e1[i] + mu[i] % P for i in range(n)]
     return (c0, c1)
 
 def keygen(msk, y):
-    dk = vector_vector_inner_product(msk, y, q)
+    dk = sum(y[i] * msk[i] for i in range(n)) % P
     return dk
 
 def decrypt(dk, y, c):
     (c0, c1) = c
-    res1 = vector_vector_inner_product(y, c1, q)
-    res0 = dk*c0 % q
-    res = res1 - res0 % q
-    return res // delta
+    res1 = sum(y[i] * c1[i] for i in range(n)) % P
+    res0 = c0 * dk % P
+    res = list(res1 - res0)[0]
+    return round(float(res) / delta)
 
-y = sample_uniform_vector(n, B)
-x = sample_uniform_vector(n, B)
+y = [random.randint(0, B - 1) for _ in range(n)]
+x = [random.randint(0, B - 1) for _ in range(n)]
 (msk, mpk) = setup()
 c = encrypt(mpk, x)
 dk = keygen(msk, y)
 dec = decrypt(dk, y, c)
-res = vector_vector_inner_product(x, y, q)
-print(res == dec)
+res = vect_ip(x, y, q)
+print(res)
+print(dec)

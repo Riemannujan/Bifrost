@@ -1,50 +1,104 @@
 from utils import *
-import random
-import numpy as np
 
-q = 2**607 - 1
-B = 10 #Bound of the values of x and y entries
-t = 4 #Size of the polynomial n sur le papier
-n = 5 #Size of the vector l sur le papier
-K = n*(B*n)*(B*n) + 1
-delta = q // K
-P = np.polynomial.Polynomial([1] + [0] * (t-2) + [1])
+# q
+coef_modulus = 2**31 - 1
+# Size of the polynomial, n in the paper
+t = 2 ** 4
+poly_modulus = init_poly_modulus(t)
+# Size of the vector, l in the paper
+size = 5
+# Bounds on x and y
+Bx = 10
+By = 10
+K = size * Bx * By + 1
+delta = coef_modulus // K
 
-def setup():
-    a = rand_pol(t, q)
-    s = [rand_bd_pol(t, 1) for _ in range(n)]
-    e = [rand_bd_pol(t, 1) for _ in range(n)]
-    b = [a * s[i] + e[i] % P for i in range(n)]
-    mpk = (a, b)
-    return (s, mpk)
+#====================================================================================================================
 
-def encrypt(mpk, x):
-    (a, b) = mpk
-    u = rand_bd_pol(t, 1)
-    e0 = rand_bd_pol(t, 1)
-    e1 = [rand_bd_pol(t, 1) for _ in range(n)]
-    c0 = a * u + e0 % P
-    mu = [delta * x[i] * pol_unit(t) for i in range(n)]
-    c1 = [u * b[i] + e1[i] + mu[i] % P for i in range(n)]
-    return (c0, c1)
+def setup(
+    coef_modulus: int,
+    poly_modulus: np.ndarray,
+    size: int,
+):
+    # Draw the secret
+    s = [random_ternary_poly(coef_modulus, poly_modulus) for _ in range(size)]
+    # Generate noise e
+    e = [random_normal_poly(coef_modulus, poly_modulus) for _ in range(size)]
+    # Generate uniform poly a
+    a = random_uniform_poly(coef_modulus, poly_modulus)
+    # RLWE instance b
+    b = [a * s[i] + e[i] for i in range(size)]
+    return s, a, b
 
-def keygen(msk, y):
-    dk = sum(y[i] * msk[i] for i in range(n)) % P
+def encrypt(
+    msg: list,
+    pk0: QuotientRingPoly,
+    pk1: list,
+    coef_modulus: int,
+    poly_modulus: np.ndarray,
+    size: int,
+    delta: int,
+):
+    # Generate random polynomial u
+    u = random_ternary_poly(coef_modulus, poly_modulus)
+    # Generate noises e0, e1
+    e0 = random_normal_poly(coef_modulus, poly_modulus)
+    e1 = [random_normal_poly(coef_modulus, poly_modulus) for _ in range(size)]
+    # Mask the randomness u
+    c0 = pk0 * u + e0
+    # Mask the message with a rlwe instance (b * u + e + m)
+    unit = unit_poly(coef_modulus, poly_modulus)
+    c1 = [pk1[i] * u + e1[i] + cst_poly(delta * msg[i], unit, coef_modulus, poly_modulus) for i in range(size)]
+    return c0, c1
+
+def keygen(
+    sk: list,
+    y: list,
+    size: int,
+):
+    dk = cst_poly(y[0], sk[0], coef_modulus, poly_modulus)
+    for i in range(1, size):
+        dk += cst_poly(y[i], sk[i], coef_modulus, poly_modulus)
     return dk
 
-def decrypt(dk, y, c):
-    (c0, c1) = c
-    res1 = sum(y[i] * c1[i] for i in range(n)) % P
-    res0 = c0 * dk % P
-    res = list(res1 - res0)[0]
-    return round(float(res) / delta)
+def decrypt(
+    dk: QuotientRingPoly,
+    y: list,
+    c0: QuotientRingPoly,
+    c1: list,
+    coef_modulus: int,
+    poly_modulus: np.ndarray,
+    delta: int,
+    size: int,
+):
+    msg = cst_poly(y[0], c1[0], coef_modulus, poly_modulus)
+    for i in range(1, size):
+        msg += cst_poly(y[i], c1[i], coef_modulus, poly_modulus)
+    msg = round((msg - c0 * dk).coef[0] / delta)
+    return msg
 
-y = [random.randint(0, B - 1) for _ in range(n)]
-x = [random.randint(0, B - 1) for _ in range(n)]
-(msk, mpk) = setup()
-c = encrypt(mpk, x)
-dk = keygen(msk, y)
-dec = decrypt(dk, y, c)
-res = vect_ip(x, y, q)
+
+#=======================================================================================================================
+
+
+# Setup the keys
+sk, pk0, pk1 = setup(coef_modulus, poly_modulus, size)
+# Generate random small message in R_t
+msg = random_uniform_vector(size, Bx)
+
+# Generate random weight vector
+y = random_uniform_vector(size, By)
+
+# Encrypt the message into two ciphertexts
+c0, c1 = encrypt(msg, pk0, pk1, coef_modulus, poly_modulus, size, delta)
+
+# Decryption key
+dk = keygen(sk, y, size)
+
+# Decrypt the message and return the noise
+msg_decr = decrypt(dk, y, c0, c1, coef_modulus, poly_modulus, delta, size)
+
+res = sum(msg[i] * y[i] for i in range(size))
+
+print(msg_decr)
 print(res)
-print(dec)

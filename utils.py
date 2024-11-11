@@ -190,7 +190,7 @@ class QuotientRingPoly:
     def __repr__(self):
         r = f"{self.coef}, {self.coef_modulus}, {self.poly_modulus}"
         return r
-    
+
 def unit_poly(
     coef_modulus: int,
     poly_modulus: Union[int, np.array],
@@ -198,6 +198,16 @@ def unit_poly(
     poly_modulus = init_poly_modulus(poly_modulus)
     size = len(poly_modulus) - 1
     coef = np.array([1] * size)
+    return QuotientRingPoly(coef, coef_modulus, poly_modulus)
+
+
+def zero_poly(
+    coef_modulus: int,
+    poly_modulus: Union[int, np.array],
+) -> QuotientRingPoly:
+    poly_modulus = init_poly_modulus(poly_modulus)
+    size = len(poly_modulus) - 1
+    coef = np.array([0] * size)
     return QuotientRingPoly(coef, coef_modulus, poly_modulus)
 
 def cst_poly(
@@ -209,6 +219,19 @@ def cst_poly(
     coef = np.array([k * c for c in poly.coef])
     return QuotientRingPoly(coef, coef_modulus, poly_modulus)
 
+
+def msg2pt(L: list,
+    coef_modulus: int,
+    poly_modulus: Union[int, np.array],
+) -> QuotientRingPoly:
+    pt = [[QuotientRingPoly([l], coef_modulus, poly_modulus)] for l in L]
+    return pt
+
+def pt2msg(L: list):
+    L2 = [l[0].coef.tolist() for l in L]
+    return [l[0] for l in L2]
+
+#QuotientRingPoly(coef, coef_modulus, poly_modulus)
 
 def random_binary_poly(
     coef_modulus: int, poly_modulus: Union[int, np.array]

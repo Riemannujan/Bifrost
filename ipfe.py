@@ -1,5 +1,6 @@
 from utils import *
 
+"""
 # q
 coef_modulus = 2**31 - 1
 # Size of the polynomial, n in the paper
@@ -12,6 +13,7 @@ Bx = 10
 By = 10
 K = size * Bx * By + 1
 delta = coef_modulus // K
+"""
 
 #====================================================================================================================
 
@@ -51,9 +53,11 @@ def encrypt(
     c1 = [pk1[i] * u + e1[i] + cst_poly(delta * msg[i], unit, coef_modulus, poly_modulus) for i in range(size)]
     return c0, c1
 
-def keygen(
+def keyder(
     sk: list,
     y: list,
+    coef_modulus: int,
+    poly_modulus: np.ndarray,
     size: int,
 ):
     dk = cst_poly(y[0], sk[0], coef_modulus, poly_modulus)
@@ -80,7 +84,7 @@ def decrypt(
 
 #=======================================================================================================================
 
-
+"""
 # Setup the keys
 sk, pk0, pk1 = setup(coef_modulus, poly_modulus, size)
 # Generate random small message in R_t
@@ -93,7 +97,7 @@ y = random_uniform_vector(size, By)
 c0, c1 = encrypt(msg, pk0, pk1, coef_modulus, poly_modulus, size, delta)
 
 # Decryption key
-dk = keygen(sk, y, size)
+dk = keyder(sk, y, coef_modulus, poly_modulus, size)
 
 # Decrypt the message and return the noise
 msg_decr = decrypt(dk, y, c0, c1, coef_modulus, poly_modulus, delta, size)
@@ -102,3 +106,6 @@ res = sum(msg[i] * y[i] for i in range(size))
 
 print(msg_decr)
 print(res)
+"""
+
+

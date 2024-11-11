@@ -1,44 +1,123 @@
 from utils import *
+from ipfe import *
+from bgv import *
 
-def key_gen():
-    A = sample_uniform_vector(n, q)
-    sk = sample_bounded_vector(n, B)
-    As = vector_vector_multiplication(A, sk, q)
-    e = scalar_vector_multiplication(t, sample_bounded_vector(n, B), q)
-    b = vector_vector_addition(As, e, q)
-    pk = (A, b)
-    return (sk, pk)
 
-def encrypt(pk, m):
-    (A, b) = pk
-    u = sample_bounded_vector(n, B)
-    e1 = scalar_vector_multiplication(t, sample_bounded_vector(n, B), q)
-    e2 = scalar_vector_multiplication(t, sample_bounded_vector(n, B), q)
-    Aalpha = vector_vector_multiplication(A, alpha, q)
-    c1 = vector_vector_addition(Aalpha, vector_vector_addition(e1, u, q), q)
-    balpha = vector_vector_multiplication(b, alpha, q)
-    mu = vector_vector_multiplication(m, u, q)
-    c2 = vector_vector_addition(balpha, vector_vector_addition(e2, mu, q), q)
-    return (c1, c2)
+# Key derivation with y as a plaintext
+def eval_keyder_pt(
+    C_msk: list,
+    y: list,
+    zero: list,
+    size: int,
+):
+    dk0, dk1 = pt_x_ct(y[0], (C_msk[0])[0], (C_msk[0])[1], zero)
+    for i in range(1, size):
+        c0, c1 = pt_x_ct(y[i], (C_msk[i])[0], (C_msk[i])[1], zero)
+        dk0, dk1 = add(dk0, dk1, c0, c1)
+    return dk0, dk1
 
-def keyder(pk, sk, v):
-    (A, b) = pk
-    vs = vector_vector_addition(v, scalar_vector_multiplication(-1, sk, q), q)
-    dk = vector_vector_multiplication(A, vector_vector_multiplication(alpha, vs, q), q)
-    return dk
+# Key derivation with y as a ciphertext for function hiding
+def eval_keyder(
+    C_msk: list,
+    C_y: list,
+    eks: QuotientRingPoly,
+    coef_modulus: int,
+    poly_modulus: np.ndarray,
+    base: int,
+    size: int,
+):
+    c_star0, c_star1, c_star2 = mul((C_msk[0])[0], (C_msk[0])[1], (C_y[0])[0], (C_y[0])[1])
+    dk0, dk1 = relinearize(c_star0, c_star1, c_star2, eks, base, coef_modulus, poly_modulus)
+    for i in range(1, size):
+        c_star0, c_star1, c_star2 = mul((C_msk[i])[0], (C_msk[i])[1], (C_y[i])[0], (C_y[i])[1])
+        c_hat0, c_hat1 = relinearize(c_star0, c_star1, c_star2, eks, base, coef_modulus, poly_modulus)
+        dk0, dk1 = add(c_hat0, c_hat1, dk0, dk1)
+    return dk0, dk1
 
-def decrypt(dk, v, ct):
-    (c1, c2) = ct
-    vc = vector_vector_multiplication(v, c1, q)
-    dkvc = vector_vector_addition(dk, scalar_vector_multiplication(-1, vc, q), q)
-    res = vector_vector_addition(c2, dkvc, q)
-    res = [res[i] % q for i in range(n)]
-    return [res[i] % t for i in range(n)]
 
-(sk, pk) = key_gen()
-m = sample_uniform_vector(n, t)
-v = m
-ct = encrypt(pk, m)
-dk = keyder(pk, sk, v)
-res = decrypt(dk, v, ct)
-print(res)
+#=======================================================================================================================
+
+
+n = 2 ** 4
+plaintext_modulus = 97 #7
+#plaintext_modulus = 65537
+poly_modulus = init_poly_modulus(n)
+# q
+coef_modulus = 2 ** 31 - 1
+# Size of the vector, l in the paper
+size = 5
+# Bounds on x and y
+Bx = 10
+By = 10
+K = size * Bx * By + 1
+delta = coef_modulus // K
+# Base
+base = 5
+
+# =====SETUP=========================================================================================
+
+# Generate FE keys
+msk, mpk0, mpk1 = setup(coef_modulus, poly_modulus, size)
+
+# Generate HE keys
+sk = gen_secret_key(coef_modulus, poly_modulus)
+pk0, pk1 = gen_public_key(sk, coef_modulus, poly_modulus, plaintext_modulus)
+eks = gen_relinearization_key(sk, base, coef_modulus, poly_modulus, plaintext_modulus)
+
+# Encrypt the master secret key
+C_msk = [bgv_encrypt(msk[i], pk0, pk1, coef_modulus, poly_modulus, plaintext_modulus) for i in range(size)]
+
+# ====MESSAGES=======================================================================================
+
+# Generate random small message
+msg = random_uniform_vector(size, Bx)
+
+# Encrypt the message
+c0, c1 = encrypt(msg, mpk0, mpk1, coef_modulus, poly_modulus, size, delta)
+
+# Generate random weight vector
+y = random_uniform_vector(size, By)
+
+# ====FUNCTION HIDING================================================================================
+
+# Encrypt the function
+Pt_y = msg2pt(y, coef_modulus, poly_modulus)
+C_y = [bgv_encrypt((Pt_y[i])[0], pk0, pk1, coef_modulus, poly_modulus, plaintext_modulus) for i in range(size)]
+
+# Evaluation of the key derivation
+dk0, dk1 = eval_keyder(C_msk, C_y, eks, coef_modulus, poly_modulus, base, size)
+
+# Decryption of the decryption key
+dk_pt = bgv_decrypt(dk0, dk1, sk, plaintext_modulus)
+dk_pt = mod_center(dk_pt, plaintext_modulus, True)
+
+# ====PLAIN KEYDER===================================================================================
+
+# Evaluation of the key derivation
+zero = bgv_encrypt(QuotientRingPoly([0], coef_modulus, poly_modulus), pk0, pk1, coef_modulus, poly_modulus, plaintext_modulus)
+dk0, dk1 = eval_keyder_pt(C_msk, y, zero, size)
+
+# Decryption of the decryption key
+dk = bgv_decrypt(dk0, dk1, sk, plaintext_modulus)
+dk = mod_center(dk, plaintext_modulus, True)
+
+# Decryption key generated by IPFE
+dk_fe = keyder(msk, y, coef_modulus, poly_modulus, size) #% plaintext_modulus
+dk_fe = mod_center(dk_fe, plaintext_modulus, True)
+
+#print("KeyDer IPFE:    " + str(dk_fe))
+#print("KeyDer Bifrost: " + str(dk))
+#print("KeyDer Plain:   " + str(dk_pt))
+
+# Retrieve the result
+msg_decr_fe = decrypt(dk_fe, y, c0, c1, coef_modulus, poly_modulus, delta, size)
+msg_decr_pt = decrypt(dk_pt, y, c0, c1, coef_modulus, poly_modulus, delta, size)
+msg_decr = decrypt(dk, y, c0, c1, coef_modulus, poly_modulus, delta, size)
+msg_res = sum(msg[i] * y[i] for i in range(size))
+
+print("Decrypt IPFE: " + str(msg_decr_fe))
+print("Decrypt Bifrost: " + str(msg_decr_pt))
+print("Decrypt function-hiding Bifrost: " + str(msg_decr))
+print("Expected result: " + str(msg_res))
+
+

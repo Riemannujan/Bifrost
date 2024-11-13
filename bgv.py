@@ -14,7 +14,7 @@ from utils import *
 # BGV PKE scheme ==============================================#
 #==============================================================#
 
-def bgv_keygen(
+def BGV_keygen(
     coef_modulus: int,
     poly_modulus: np.ndarray,
     plaintext_modulus,
@@ -39,7 +39,7 @@ def bgv_keygen(
 
     return sk, b, -a, evk
 
-def bgv_encrypt(
+def BGV_encrypt(
     msg: QuotientRingPoly,
     pk0: QuotientRingPoly,
     pk1: QuotientRingPoly,
@@ -55,7 +55,7 @@ def bgv_encrypt(
     c1 = pk1 * u + e1 * plaintext_modulus
     return c0, c1
 
-def bgv_decrypt(
+def BGV_decrypt(
     c0: QuotientRingPoly,
     c1: QuotientRingPoly,
     sk: QuotientRingPoly,

@@ -1,12 +1,8 @@
-import random
-import numpy as np
-
 import math
 import random
 from typing import List, Union
 
 import numpy as np
-from Crypto.Util.number import getPrime, getRandomNBitInteger
 from numpy.polynomial.polynomial import polyadd, polymul
 
 
@@ -210,6 +206,7 @@ def zero_poly(
     coef = np.array([0] * size)
     return QuotientRingPoly(coef, coef_modulus, poly_modulus)
 
+
 def cst_poly(
     k: int,
     poly: QuotientRingPoly,
@@ -227,26 +224,14 @@ def msg2pt(L: list,
     pt = [[QuotientRingPoly([l], coef_modulus, poly_modulus)] for l in L]
     return pt
 
-def pt2msg(L: list):
-    L2 = [l[0].coef.tolist() for l in L]
-    return [l[0] for l in L2]
 
-#QuotientRingPoly(coef, coef_modulus, poly_modulus)
-
-def random_binary_poly(
-    coef_modulus: int, poly_modulus: Union[int, np.array]
-) -> QuotientRingPoly:
-    """Generate a random binary polynomial in the given quotient ring."""
-    poly_modulus = init_poly_modulus(poly_modulus)
-    size = len(poly_modulus) - 1
-    coef = np.random.choice([0, 1], size=size, dtype=object)
-    return QuotientRingPoly(coef, coef_modulus, poly_modulus)
+#=======================================================================================================================
 
 
 def random_ternary_poly(
     coef_modulus: int, poly_modulus: Union[int, np.array]
 ) -> QuotientRingPoly:
-    """Generate a random ternary polynomial in the given quotient ring."""
+    #Generate a random ternary polynomial in the given quotient ring.
     poly_modulus = init_poly_modulus(poly_modulus)
     size = len(poly_modulus) - 1
 
@@ -265,7 +250,7 @@ def random_uniform_poly(
     poly_modulus: Union[int, np.array],
     high=None,
 ) -> QuotientRingPoly:
-    """Generate a random polynomial with discrete coefficients uniformly distributed in the given quotient ring."""
+    #Generate a random polynomial with discrete coefficients uniformly distributed in the given quotient ring.
 
     if high is None:
         high = coef_modulus - 1
@@ -275,14 +260,14 @@ def random_uniform_poly(
     # coef = np.random.randint(0, coef_modulus, size, dtype=object)
     return QuotientRingPoly(coef, coef_modulus, poly_modulus)
 
-
 def random_normal_poly(
     coef_modulus: int,
     poly_modulus: Union[int, np.array],
     mu: float = 0,
     std: float = 3.8,
 ) -> QuotientRingPoly:
-    """Generate a random polynomial with discrete coefficients extracted from a normal distribution in the given quotient ring."""
+    #Generate a random polynomial with discrete coefficients extracted from a normal distribution in the given quotient ring.
+
     poly_modulus = init_poly_modulus(poly_modulus)
     size = len(poly_modulus) - 1
     coef = np.array([round(random.gauss(mu, std)) for _ in range(size)], dtype=object)

@@ -7,3 +7,4 @@ The folder is organized as follows:
 - SPADE.py contains the core algorithms (Setup, Enc, KeyDer, Dec) for the lwe-based SPADE scheme.
 - bifrost.py contains the implementation of the BGV evaluation algorithm on SPADE and the BGV evaluation algorithm on IPFE (2 versions: vanilla and function-hiding)
 
+Note: There are problems in the BGV evaluation of SPADE. This is a consequence of the addition of a noise in LWE-SPADE. The choices of parameters q, t, n and the Gaussian distribution error are not well chosen. Instead of an empirical approach, I will have a formal look at the conditions these parameters need to respect and come back to this project afterward!
